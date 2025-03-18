@@ -92,37 +92,27 @@ class UserGenerator {
     const nile = this.ensureNileInitialized();
     console.log(`Generating ${count} users...`);
     let successCount = 0;
-    let processedCount = 0;
     
-    // Create a queue of users to process
-    const userQueue = Array.from({ length: count }, () => ({
-      email: this.generateRandomEmail(),
-      password: this.TEST_PASSWORD
-    }));
+    // Process users one at a time
+    for (let i = 0; i < count; i++) {
+      const user = {
+        email: this.generateRandomEmail(),
+        password: this.TEST_PASSWORD
+      };
 
-    // Process users in chunks
-    while (userQueue.length > 0) {
-      const chunk = userQueue.splice(0, this.CHUNK_SIZE);
-      const promises = chunk.map((user) => 
-        nile.api.users.createTenantUser({
+      try {
+        await nile.api.users.createTenantUser({
           email: user.email,
           password: user.password,
-        })
-        .then(() => {
-          this.users.push(user);
-          successCount++;
-        })
-        .catch((error) => {
-          console.error(`Error creating user with email ${user.email}:`, error);
-        })
-      );
+        });
+        this.users.push(user);
+        successCount++;
 
-      // Wait for the current chunk to complete
-      await Promise.all(promises);
-      processedCount += chunk.length;
-
-      if (processedCount % 1000 === 0 || processedCount === count) {
-        console.log(`Generated ${processedCount} users...`);
+        if ((i + 1) % 1000 === 0 || i + 1 === count) {
+          console.log(`Generated ${i + 1} users...`);
+        }
+      } catch (error) {
+        console.error(`Error creating user with email ${user.email}:`, error);
       }
     }
     
