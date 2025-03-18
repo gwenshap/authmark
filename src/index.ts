@@ -1,15 +1,13 @@
 import { Nile, Server } from '@niledatabase/server';
 import { faker } from '@faker-js/faker';
 import * as dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
 const TOTAL_USERS = 5_000_000;
-//const TOTAL_USERS = 100;
-// const HOURLY_AUTH_USERS = 6000;
-const HOURLY_AUTH_USERS = 100;
-// const HOURS_TO_RUN = 24;
-const HOURS_TO_RUN = 1;
+const HOURLY_AUTH_USERS = 6000;
+const HOURS_TO_RUN = 24;
 
 interface User {
   email: string;
@@ -36,7 +34,7 @@ class UserGenerator {
 
   private async initNile() {
     this.nile = await Nile({
-  //      debug: true,
+     //  debug: true,
     });
     console.log("Nile initialized");
   }
@@ -85,6 +83,11 @@ class UserGenerator {
     }
   }
 
+  private generateRandomEmail(): string {
+    const randomId = Buffer.from(crypto.randomBytes(12)).toString('hex');
+    return `user${randomId}@loadtest.nile.dev`;
+  }
+
   async generateUsers(count: number): Promise<boolean> {
     const nile = this.ensureNileInitialized();
     console.log(`Generating ${count} users...`);
@@ -93,7 +96,7 @@ class UserGenerator {
     
     // Create a queue of users to process
     const userQueue = Array.from({ length: count }, () => ({
-      email: faker.internet.email(),
+      email: this.generateRandomEmail(),
       password: this.TEST_PASSWORD
     }));
 
