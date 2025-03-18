@@ -4,8 +4,8 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
-// const TOTAL_USERS = 5_000_000;
-const TOTAL_USERS = 100;
+const TOTAL_USERS = 5_000_000;
+//const TOTAL_USERS = 100;
 // const HOURLY_AUTH_USERS = 6000;
 const HOURLY_AUTH_USERS = 100;
 // const HOURS_TO_RUN = 24;
@@ -23,6 +23,16 @@ class UserGenerator {
   private readonly TEST_USER = 'testRunner@thenile.dev';
   private tenantId: string | null = null;
   private readonly TENANT_NAME = 'Test Tenant';
+  private readonly CHUNK_SIZE = 10;
+
+  // Add decorator utility method
+  private ensureNileInitialized() {
+    if (!this.nile) {
+      console.error('Nile client not initialized');
+      process.exit(1);
+    }
+    return this.nile;
+  }
 
   private async initNile() {
     this.nile = await Nile({
@@ -32,25 +42,21 @@ class UserGenerator {
   }
 
   private async ensureTestUser(): Promise<void> {
-    if (!this.nile) {
-      throw new Error('Nile client not initialized');
-    }
-    // Note that we don't need to handle the response from the login
-    // Nile SDK will store the token in memory and reuse it for subsequent requests
+    const nile = this.ensureNileInitialized();
     try {
       // Try to login first
-      const loginResponse = await this.nile.api.login({
+      const loginResponse = await nile.api.login({
         email: this.TEST_USER,
         password: this.TEST_PASSWORD,
       })
       console.log('Logged in as test runner');
     } catch (error) {
       // If login fails, create the user and then login
-      await this.nile.api.users.createUser({
+      await nile.api.users.createUser({
         email: this.TEST_USER,
         password: this.TEST_PASSWORD,
       });
-      await this.nile.api.login({
+      await nile.api.login({
         email: this.TEST_USER,
         password: this.TEST_PASSWORD,
       });
@@ -59,54 +65,61 @@ class UserGenerator {
   }
 
   private async ensureTenant(): Promise<void> {
+    const nile = this.ensureNileInitialized();
     // List existing tenants
-    if (!this.nile) {
-      console.error('Nile client not initialized');
-      process.exit(1);
-    }
-    const tenants = await this.nile.api.tenants.listTenants();
+    const tenants = await nile.api.tenants.listTenants();
     console.log(tenants);
     const testTenant = tenants.find((t: any) => t.name.startsWith('Test Tenant'));
     
     if (testTenant) {
       this.tenantId = testTenant.id;
-      this.nile.tenantId = this.tenantId;
+      nile.tenantId = this.tenantId;
       console.log(`Using existing tenant: ${testTenant.name} (${this.tenantId})`);
     } else {
-      const response = await this.nile.api.tenants.createTenant({
+      const response = await nile.api.tenants.createTenant({
         name: `Test Tenant ${Math.floor(Math.random() * 1000)}`
       });
       this.tenantId = response.id;
-      this.nile.tenantId = this.tenantId; // this sets the tenant context for all subsequent requests
+      nile.tenantId = this.tenantId; // this sets the tenant context for all subsequent requests
       console.log(`Created tenant ${response.name} with ID: ${this.tenantId}`);
     }
   }
 
   async generateUsers(count: number): Promise<boolean> {
-    if (!this.nile) {
-      console.error('Nile client not initialized');
-      process.exit(1);
-    }
+    const nile = this.ensureNileInitialized();
     console.log(`Generating ${count} users...`);
     let successCount = 0;
+    let processedCount = 0;
     
-    for (let i = 0; i < count; i++) {
-      const email = faker.internet.email();
-      try {
-        // no need to pass tenantId, it's already set
-        await this.nile.api.users.createTenantUser({
-          email,
-          password: this.TEST_PASSWORD,
-        });
-        
-        this.users.push({ email, password: this.TEST_PASSWORD });
-        successCount++;
-        
-        if (i % 1000 === 0) {
-          console.log(`Generated ${i} users...`);
-        }
-      } catch (error) {
-        console.error(`Error creating user ${i}:`, error);
+    // Create a queue of users to process
+    const userQueue = Array.from({ length: count }, () => ({
+      email: faker.internet.email(),
+      password: this.TEST_PASSWORD
+    }));
+
+    // Process users in chunks
+    while (userQueue.length > 0) {
+      const chunk = userQueue.splice(0, this.CHUNK_SIZE);
+      const promises = chunk.map((user) => 
+        nile.api.users.createTenantUser({
+          email: user.email,
+          password: user.password,
+        })
+        .then(() => {
+          this.users.push(user);
+          successCount++;
+        })
+        .catch((error) => {
+          console.error(`Error creating user with email ${user.email}:`, error);
+        })
+      );
+
+      // Wait for the current chunk to complete
+      await Promise.all(promises);
+      processedCount += chunk.length;
+
+      if (processedCount % 1000 === 0 || processedCount === count) {
+        console.log(`Generated ${processedCount} users...`);
       }
     }
     
@@ -115,10 +128,11 @@ class UserGenerator {
   }
 
   async authenticateRandomUser() {
+    const nile = this.ensureNileInitialized();
     const randomUser = this.users[Math.floor(Math.random() * this.users.length)];
     
     try {
-      await this.nile.api.login({
+      await nile.api.login({
         email: randomUser.email,
         password: randomUser.password,
       });
@@ -129,14 +143,11 @@ class UserGenerator {
   }
 
   private async loadExistingUsers(): Promise<boolean> {
-    if (!this.nile) {
-      console.error('Nile client not initialized');
-      process.exit(1);
-    }
-    console.log('Loading existing users from database for tenant', this.nile.tenantId);
+    const nile = this.ensureNileInitialized();
+    console.log('Loading existing users from database for tenant', nile.tenantId);
     try {
       // Tenant ID is already set, so we don't need to pass it in
-      const response = await this.nile.api.users.listUsers();
+      const response = await nile.api.users.listUsers();
       this.users = response.map((user: any) => ({
         email: user.email,
         password: this.TEST_PASSWORD
