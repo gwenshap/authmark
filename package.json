@@ -1,0 +1,21 @@
+{
+  "name": "nile-user-generator",
+  "version": "1.0.0",
+  "description": "Script to generate and authenticate Nile users",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "start": "node --loader ts-node/esm src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@niledatabase/server": "^3.1.0-alpha.0",
+    "@faker-js/faker": "^8.4.1",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+} 
