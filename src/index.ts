@@ -92,6 +92,7 @@ class UserGenerator {
     const nile = this.ensureNileInitialized();
     console.log(`Generating ${count} users...`);
     let successCount = 0;
+    let batchStartTime = Date.now();
     
     // Process users one at a time
     for (let i = 0; i < count; i++) {
@@ -109,7 +110,9 @@ class UserGenerator {
         successCount++;
 
         if ((i + 1) % 1000 === 0 || i + 1 === count) {
-          console.log(`Generated ${i + 1} users...`);
+          const batchDuration = (Date.now() - batchStartTime) / 1000; // Convert to seconds
+          console.log(`Generated ${i + 1} users... (Batch took ${batchDuration.toFixed(2)} seconds)`);
+          batchStartTime = Date.now(); // Reset timer for next batch
         }
       } catch (error) {
         console.error(`Error creating user with email ${user.email}:`, error);
