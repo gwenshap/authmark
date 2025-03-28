@@ -15,10 +15,17 @@ const TEST_USER = 'testRunner@thenile.dev';
             email: TEST_USER,
             password: TEST_PASSWORD,
         });
-        console.log("Logged in"); // no response expected?
+        console.log("Logged in");
     } catch (error) {
         console.error("Failed to login");
     }
+
+    // create a new tenant
+    const newTenant = await nile.api.tenants.createTenant({
+        name: "My Company",
+    });
+    console.log(newTenant);
+
     // should list all tenants
     const tenantResponse = await nile.api.tenants.listTenants();
     console.log(tenantResponse);

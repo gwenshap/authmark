@@ -94,7 +94,7 @@ class UserGenerator {
     let successCount = 0;
     let batchStartTime = Date.now();
     
-    // Process users one at a time
+    // Process users one at a time, but don't store them
     for (let i = 0; i < count; i++) {
       const user = {
         email: this.generateRandomEmail(),
@@ -106,18 +106,20 @@ class UserGenerator {
           email: user.email,
           password: user.password,
         });
-        this.users.push(user);
         successCount++;
 
         if ((i + 1) % 1000 === 0 || i + 1 === count) {
-          const batchDuration = (Date.now() - batchStartTime) / 1000; // Convert to seconds
+          const batchDuration = (Date.now() - batchStartTime) / 1000;
           console.log(`Generated ${i + 1} users... (Batch took ${batchDuration.toFixed(2)} seconds)`);
-          batchStartTime = Date.now(); // Reset timer for next batch
+          batchStartTime = Date.now();
         }
       } catch (error) {
         console.error(`Error creating user with email ${user.email}:`, error);
       }
     }
+    
+    // Load all users after creation
+    await this.loadExistingUsers();
     
     console.log(`User generation completed. Successfully created ${successCount}/${count} users`);
     return successCount === count;
